@@ -12,7 +12,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
   useEffect(() => {
     const timer = setTimeout(() => {
       triggerTransition()
-    }, 2500)
+    }, 1800) // Reduced from 2500ms
 
     return () => clearTimeout(timer)
   }, [])
@@ -102,13 +102,24 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
 
       {/* Title overlay */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <h1 className="font-serif text-7xl md:text-9xl text-parchment tracking-wider drop-shadow-2xl">
+        <h1 className="font-serif text-6xl sm:text-7xl md:text-9xl text-parchment tracking-wider drop-shadow-2xl">
           BOUNTY
         </h1>
         <p className="font-mono text-gold text-lg mt-4 tracking-widest">
           by SH1P
         </p>
       </div>
+
+      {/* Skip button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          triggerTransition()
+        }}
+        className="fixed bottom-6 right-6 font-mono text-parchment/50 text-sm hover:text-parchment/80 transition-colors"
+      >
+        Skip &crarr;
+      </button>
     </div>
   )
 }

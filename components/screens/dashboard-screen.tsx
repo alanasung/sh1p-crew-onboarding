@@ -1,6 +1,9 @@
 'use client'
 
-import type { Role, DoubloonEvent, UserData } from '@/lib/types'
+import { useState, useRef } from 'react'
+import type { Role, DoubloonEvent, UserData, EngagementTask } from '@/lib/types'
+import { TrendingUp, Telescope, Anchor, ChevronDown, ChevronUp, Pencil, X } from 'lucide-react'
+import { ding } from '@/lib/audio'
 
 interface DashboardScreenProps {
   userData: UserData
@@ -10,8 +13,13 @@ interface DashboardScreenProps {
   doubloonHistory: DoubloonEvent[]
   growthPosts: string[]
   venturePosts: string[]
+  engagementTasks: EngagementTask[]
   onAddRole: (role: Role) => void
   onNavigateToRole: (role: Role) => void
+  onCompleteEngagementTask: (taskId: string) => void
+  onUpdateUser: (userData: UserData) => void
+  onResetState: () => void
+  onEarnDoubloons: (amount: number, reason: string, clickX?: number, clickY?: number) => void
 }
 
 const newsSources = [
@@ -21,11 +29,20 @@ const newsSources = [
   { name: 'The Information', url: 'https://theinformation.com' },
 ]
 
-const roleLabels: Record<Role, { title: string; icon: string }> = {
-  growth: { title: 'Growth', icon: '~' },
-  venture: { title: 'Venture Research', icon: '*' },
-  cohort: { title: 'Cohort Applicant', icon: '+' },
+const roleLabels: Record<Role, { title: string; icon: React.ReactNode }> = {
+  growth: { title: 'Growth', icon: <TrendingUp className="w-4 h-4" /> },
+  venture: { title: 'Venture Research', icon: <Telescope className="w-4 h-4" /> },
+  cohort: { title: 'Cohort Applicant', icon: <Anchor className="w-4 h-4" /> },
 }
+
+// Mock leaderboard data
+const mockLeaderboard = [
+  { name: 'Jack S.', doubloons: 245 },
+  { name: 'Maya R.', doubloons: 198 },
+  { name: 'Devon T.', doubloons: 156 },
+  { name: 'Priya K.', doubloons: 134 },
+  { name: 'Marco V.', doubloons: 89 },
+]
 
 export function DashboardScreen({
   userData,
@@ -35,15 +52,42 @@ export function DashboardScreen({
   doubloonHistory,
   growthPosts,
   venturePosts,
+  engagementTasks,
   onAddRole,
   onNavigateToRole,
+  onCompleteEngagementTask,
+  onUpdateUser,
+  onResetState,
+  onEarnDoubloons,
 }: DashboardScreenProps) {
+  const [showDoubloonInfo, setShowDoubloonInfo] = useState(false)
+  const [showEditProfile, setShowEditProfile] = useState(false)
+  const [editFormData, setEditFormData] = useState<UserData>(userData)
+  
   const validGrowthPosts = growthPosts.filter(p => p.trim()).length
   const validVenturePosts = venturePosts.filter(p => p.trim()).length
   
   const availableRoles = (['growth', 'venture', 'cohort'] as Role[]).filter(
     role => !selectedRoles.includes(role)
   )
+
+  // Calculate user's leaderboard position
+  const leaderboardWithUser = [...mockLeaderboard, { name: `${userData.firstName} ${userData.lastName.charAt(0)}.`, doubloons, isUser: true }]
+    .sort((a, b) => b.doubloons - a.doubloons)
+    .slice(0, 6)
+
+  const handleTaskComplete = (taskId: string, e: React.MouseEvent) => {
+    const task = engagementTasks.find(t => t.id === taskId)
+    if (!task || task.completed) return
+    
+    ding()
+    onCompleteEngagementTask(taskId)
+  }
+
+  const handleSaveProfile = () => {
+    onUpdateUser(editFormData)
+    setShowEditProfile(false)
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-navy via-[#0d1e33] to-navy">
@@ -57,19 +101,31 @@ export function DashboardScreen({
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto p-6 space-y-8">
+      <main className="max-w-6xl mx-auto p-4 md:p-6 space-y-6 md:space-y-8">
         {/* Welcome */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="font-serif text-3xl text-parchment">
-              Welcome back, {userData.firstName}
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className="font-serif text-2xl md:text-3xl text-parchment">
+                Welcome back, {userData.firstName}
+              </h2>
+              <button
+                onClick={() => {
+                  setEditFormData(userData)
+                  setShowEditProfile(true)
+                }}
+                className="p-1.5 text-parchment/50 hover:text-parchment/80 transition-colors"
+                title="Edit profile"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
+            </div>
             <div className="flex flex-wrap gap-2 mt-2">
               {selectedRoles.map(role => (
                 <span
                   key={role}
                   className="px-3 py-1 bg-gold/20 border border-gold/30 rounded-full 
-                    font-mono text-xs text-gold"
+                    font-mono text-xs text-gold flex items-center gap-1.5"
                 >
                   {roleLabels[role].icon} {roleLabels[role].title}
                 </span>
@@ -98,15 +154,17 @@ export function DashboardScreen({
         </div>
 
         {/* Grid layout */}
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-4 md:gap-6">
           {/* My Roles */}
-          <div className="bg-card rounded-lg border border-border/30 p-6">
+          <div className="bg-card rounded-lg border border-border/30 p-4 md:p-6">
             <h3 className="font-serif text-xl text-parchment mb-4">My Roles</h3>
             <div className="space-y-4">
               {selectedRoles.includes('growth') && (
                 <div className="p-4 bg-secondary/50 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-mono text-parchment">~ Growth Team</span>
+                    <span className="font-mono text-parchment flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-gold" /> Growth Team
+                    </span>
                     <span className="font-mono text-xs text-gold">
                       {validGrowthPosts}/3 posts
                     </span>
@@ -126,7 +184,9 @@ export function DashboardScreen({
               {selectedRoles.includes('venture') && (
                 <div className="p-4 bg-secondary/50 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-mono text-parchment">* Venture Research</span>
+                    <span className="font-mono text-parchment flex items-center gap-2">
+                      <Telescope className="w-4 h-4 text-gold" /> Venture Research
+                    </span>
                     <span className="font-mono text-xs text-gold">
                       {validVenturePosts}/5 posts
                     </span>
@@ -146,7 +206,9 @@ export function DashboardScreen({
               {selectedRoles.includes('cohort') && (
                 <div className="p-4 bg-secondary/50 rounded-lg">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-parchment">+ Cohort Applicant</span>
+                    <span className="font-mono text-parchment flex items-center gap-2">
+                      <Anchor className="w-4 h-4 text-gold" /> Cohort Applicant
+                    </span>
                     <a 
                       href="https://sh1p.co/apply"
                       target="_blank"
@@ -162,13 +224,13 @@ export function DashboardScreen({
           </div>
 
           {/* Doubloon History */}
-          <div className="bg-card rounded-lg border border-border/30 p-6">
+          <div className="bg-card rounded-lg border border-border/30 p-4 md:p-6">
             <h3 className="font-serif text-xl text-parchment mb-4">Doubloon History</h3>
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {doubloonHistory.length === 0 ? (
                 <p className="font-mono text-parchment/50 text-sm">No earnings yet</p>
               ) : (
-                doubloonHistory.map(event => (
+                doubloonHistory.slice().reverse().map(event => (
                   <div key={event.id} className="flex items-center justify-between py-2 border-b border-border/20 last:border-0">
                     <span className="font-mono text-sm text-parchment/80">{event.reason}</span>
                     <span className="font-mono text-sm text-gold">+{event.amount}</span>
@@ -178,9 +240,69 @@ export function DashboardScreen({
             </div>
           </div>
 
+          {/* Engagement Inbox */}
+          <div className="bg-card rounded-lg border border-border/30 p-4 md:p-6">
+            <h3 className="font-serif text-xl text-parchment mb-4">Engagement Inbox</h3>
+            <div className="space-y-3">
+              {engagementTasks.map(task => (
+                <div
+                  key={task.id}
+                  className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
+                    task.completed 
+                      ? 'bg-seafoam/10 border-seafoam/30' 
+                      : 'bg-secondary/50 border-border/30 hover:border-gold/30'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-sm text-parchment/80">{task.title}</span>
+                    <span className="font-mono text-xs text-gold">+{task.doubloonValue}</span>
+                  </div>
+                  <button
+                    onClick={(e) => handleTaskComplete(task.id, e)}
+                    disabled={task.completed}
+                    className={`px-3 py-1 font-mono text-xs rounded transition-all ${
+                      task.completed 
+                        ? 'bg-seafoam/20 text-seafoam cursor-default' 
+                        : 'bg-gold/20 text-gold hover:bg-gold/30'
+                    }`}
+                  >
+                    {task.completed ? 'Done' : 'Mark complete'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Leaderboard */}
+          <div className="bg-card rounded-lg border border-border/30 p-4 md:p-6">
+            <h3 className="font-serif text-xl text-parchment mb-4">{"This Week's Top Crew"}</h3>
+            <div className="space-y-2">
+              {leaderboardWithUser.map((entry, index) => (
+                <div
+                  key={entry.name}
+                  className={`flex items-center justify-between p-3 rounded-lg ${
+                    'isUser' in entry && entry.isUser
+                      ? 'bg-gold/10 border border-gold/30'
+                      : 'bg-secondary/30'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={`font-mono text-sm ${index < 3 ? 'text-gold' : 'text-parchment/60'}`}>
+                      #{index + 1}
+                    </span>
+                    <span className={`font-mono text-sm ${'isUser' in entry && entry.isUser ? 'text-gold font-bold' : 'text-parchment/80'}`}>
+                      {entry.name} {'isUser' in entry && entry.isUser && '(You)'}
+                    </span>
+                  </div>
+                  <span className="font-mono text-sm text-gold">{entry.doubloons}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Resources */}
           {(selectedRoles.includes('growth') || selectedRoles.includes('venture')) && (
-            <div className="bg-card rounded-lg border border-border/30 p-6">
+            <div className="bg-card rounded-lg border border-border/30 p-4 md:p-6">
               <h3 className="font-serif text-xl text-parchment mb-4">Resources</h3>
               <div className="space-y-4">
                 <div>
@@ -201,7 +323,9 @@ export function DashboardScreen({
                   </div>
                 </div>
                 <a
-                  href="#graphics"
+                  href="https://sh1p.co/graphics"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="block px-4 py-2 bg-gold/10 border border-gold/30 rounded-lg
                     font-mono text-sm text-gold hover:bg-gold/20 transition-colors text-center"
                 >
@@ -211,20 +335,47 @@ export function DashboardScreen({
             </div>
           )}
 
-          {/* Engagement Inbox */}
-          <div className="bg-card rounded-lg border border-border/30 p-6">
-            <h3 className="font-serif text-xl text-parchment mb-4">Engagement Inbox</h3>
-            <div className="p-8 border-2 border-dashed border-border/30 rounded-lg text-center">
-              <p className="font-mono text-parchment/50 text-sm">
-                {"You'll receive engagement tasks here. Check back soon."}
-              </p>
-            </div>
+          {/* What are Doubloons? */}
+          <div className="bg-card rounded-lg border border-border/30 p-4 md:p-6">
+            <button
+              onClick={() => setShowDoubloonInfo(!showDoubloonInfo)}
+              className="w-full flex items-center justify-between"
+            >
+              <h3 className="font-serif text-xl text-parchment">What are Doubloons?</h3>
+              {showDoubloonInfo ? (
+                <ChevronUp className="w-5 h-5 text-parchment/60" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-parchment/60" />
+              )}
+            </button>
+            
+            {showDoubloonInfo && (
+              <div className="mt-4 space-y-3">
+                <p className="font-mono text-parchment/80 text-sm">
+                  Doubloons are SH1P Crew currency. They unlock:
+                </p>
+                <ul className="space-y-2">
+                  <li className="flex items-center gap-2 font-mono text-sm text-parchment/70">
+                    <span className="text-gold">·</span> Priority review for the next cohort
+                  </li>
+                  <li className="flex items-center gap-2 font-mono text-sm text-parchment/70">
+                    <span className="text-gold">·</span> Invite-only events with founders & investors
+                  </li>
+                  <li className="flex items-center gap-2 font-mono text-sm text-parchment/70">
+                    <span className="text-gold">·</span> SH1P merch drops (coming soon)
+                  </li>
+                  <li className="flex items-center gap-2 font-mono text-sm text-parchment/70">
+                    <span className="text-gold">·</span> Bounty leaderboard ranking
+                  </li>
+                </ul>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Add a Role */}
         {availableRoles.length > 0 && (
-          <div className="bg-card rounded-lg border border-border/30 p-6">
+          <div className="bg-card rounded-lg border border-border/30 p-4 md:p-6">
             <h3 className="font-serif text-xl text-parchment mb-4">Add a Role</h3>
             <div className="flex flex-wrap gap-4">
               {availableRoles.map(role => (
@@ -234,7 +385,7 @@ export function DashboardScreen({
                   className="flex-1 min-w-[200px] p-4 border-2 border-rope/30 rounded-lg 
                     hover:border-gold transition-all duration-300 hover:scale-[1.02] text-left"
                 >
-                  <div className="font-mono text-xl text-gold mb-1">{roleLabels[role].icon}</div>
+                  <div className="text-gold mb-1">{roleLabels[role].icon}</div>
                   <h4 className="font-serif text-lg text-parchment">{roleLabels[role].title}</h4>
                 </button>
               ))}
@@ -242,9 +393,9 @@ export function DashboardScreen({
           </div>
         )}
 
-        {/* Cohort Application - always visible */}
+        {/* Cohort Application - always visible if not selected */}
         {!selectedRoles.includes('cohort') && (
-          <div className="bg-card rounded-lg border border-gold/30 p-6 text-center">
+          <div className="bg-card rounded-lg border border-gold/30 p-4 md:p-6 text-center">
             <h3 className="font-serif text-xl text-parchment mb-2">Ready for the next level?</h3>
             <p className="font-mono text-parchment/70 text-sm mb-4">
               Apply to join the next SH1P cohort
@@ -258,7 +409,109 @@ export function DashboardScreen({
             </button>
           </div>
         )}
+
+        {/* Reset button - hidden at bottom */}
+        <div className="pt-8 border-t border-border/20 text-center">
+          <button
+            onClick={onResetState}
+            className="font-mono text-xs text-parchment/30 hover:text-parchment/50 transition-colors"
+          >
+            Reset crew data
+          </button>
+        </div>
       </main>
+
+      {/* Edit Profile Modal */}
+      {showEditProfile && (
+        <div className="fixed inset-0 bg-navy/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="parchment p-6 md:p-8 rounded-lg max-w-md w-full relative noise">
+            <button
+              onClick={() => setShowEditProfile(false)}
+              className="absolute top-4 right-4 text-navy/60 hover:text-navy"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            
+            <h3 className="font-serif text-2xl text-navy mb-6">Edit Profile</h3>
+            
+            <div className="space-y-4">
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block font-mono text-xs text-rope uppercase tracking-wider mb-1">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.firstName}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                    className="w-full px-4 py-2 bg-navy/5 border-2 border-rope/30 rounded-lg font-mono text-navy
+                      focus:outline-none focus:border-gold transition-colors"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block font-mono text-xs text-rope uppercase tracking-wider mb-1">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.lastName}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                    className="w-full px-4 py-2 bg-navy/5 border-2 border-rope/30 rounded-lg font-mono text-navy
+                      focus:outline-none focus:border-gold transition-colors"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block font-mono text-xs text-rope uppercase tracking-wider mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={editFormData.email}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, email: e.target.value }))}
+                  className="w-full px-4 py-2 bg-navy/5 border-2 border-rope/30 rounded-lg font-mono text-navy
+                    focus:outline-none focus:border-gold transition-colors"
+                />
+              </div>
+              
+              <div>
+                <label className="block font-mono text-xs text-rope uppercase tracking-wider mb-1">
+                  LinkedIn URL
+                </label>
+                <input
+                  type="url"
+                  value={editFormData.linkedIn}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, linkedIn: e.target.value }))}
+                  className="w-full px-4 py-2 bg-navy/5 border-2 border-rope/30 rounded-lg font-mono text-navy
+                    focus:outline-none focus:border-gold transition-colors"
+                />
+              </div>
+              
+              <div>
+                <label className="block font-mono text-xs text-rope uppercase tracking-wider mb-1">
+                  Phone
+                </label>
+                <input
+                  type="tel"
+                  value={editFormData.phone}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, phone: e.target.value }))}
+                  className="w-full px-4 py-2 bg-navy/5 border-2 border-rope/30 rounded-lg font-mono text-navy
+                    focus:outline-none focus:border-gold transition-colors"
+                />
+              </div>
+              
+              <button
+                onClick={handleSaveProfile}
+                className="w-full px-6 py-3 bg-navy text-gold font-mono font-bold rounded-lg border-2 border-gold/30
+                  transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] hover:bg-navy/90"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

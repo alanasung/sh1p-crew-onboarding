@@ -1,32 +1,33 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import type { Role } from '@/lib/types'
 import { CoinAnimation } from '@/components/doubloon-counter'
 import { ding } from '@/lib/audio'
+import { TrendingUp, Telescope, Anchor } from 'lucide-react'
 
 interface RoleSelectScreenProps {
   selectedRoles: Role[]
   onSelect: (roles: Role[]) => void
-  onClaim: () => void
+  onClaim: (e?: React.MouseEvent) => void
 }
 
-const roleInfo: { role: Role; icon: string; title: string; description: string }[] = [
+const roleInfo: { role: Role; icon: React.ReactNode; title: string; description: string }[] = [
   {
     role: 'growth',
-    icon: '~',
+    icon: <TrendingUp className="w-8 h-8 text-gold" />,
     title: 'Growth',
     description: 'Grow the SH1P brand. Post. Engage. Represent.',
   },
   {
     role: 'venture',
-    icon: '*',
+    icon: <Telescope className="w-8 h-8 text-gold" />,
     title: 'Venture Research',
     description: 'Scout the frontier. Post insights. Think like a VC.',
   },
   {
     role: 'cohort',
-    icon: '+',
+    icon: <Anchor className="w-8 h-8 text-gold" />,
     title: 'Aspiring Cohort Member',
     description: 'Apply to the next SH1P cohort.',
   },
@@ -35,6 +36,7 @@ const roleInfo: { role: Role; icon: string; title: string; description: string }
 export function RoleSelectScreen({ selectedRoles, onSelect, onClaim }: RoleSelectScreenProps) {
   const [showCoinAnimation, setShowCoinAnimation] = useState(false)
   const [isAnimating, setIsAnimating] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
 
   const toggleRole = (role: Role) => {
     if (selectedRoles.includes(role)) {
@@ -44,18 +46,20 @@ export function RoleSelectScreen({ selectedRoles, onSelect, onClaim }: RoleSelec
     }
   }
 
-  const handleClaim = () => {
+  const handleClaim = (e: React.MouseEvent) => {
     if (selectedRoles.length === 0 || isAnimating) return
     setIsAnimating(true)
     setShowCoinAnimation(true)
     ding()
+    
+    // Pass the click event to parent for flying coin animation
+    setTimeout(() => {
+      onClaim(e)
+    }, 800)
   }
 
   const handleAnimationComplete = () => {
     setShowCoinAnimation(false)
-    setTimeout(() => {
-      onClaim()
-    }, 200)
   }
 
   return (
@@ -63,7 +67,7 @@ export function RoleSelectScreen({ selectedRoles, onSelect, onClaim }: RoleSelec
       {showCoinAnimation && <CoinAnimation onComplete={handleAnimationComplete} />}
       
       <div className="text-center mb-8">
-        <h2 className="font-serif text-3xl md:text-5xl text-parchment mb-3">
+        <h2 className="font-serif text-3xl md:text-5xl text-parchment mb-3 text-balance">
           {"What's your role on the crew?"}
         </h2>
         <p className="font-mono text-gold text-sm">
@@ -102,7 +106,7 @@ export function RoleSelectScreen({ selectedRoles, onSelect, onClaim }: RoleSelec
                 </div>
               )}
 
-              <div className="font-mono text-3xl text-gold mb-3">{icon}</div>
+              <div className="mb-3">{icon}</div>
               <h3 className="font-serif text-xl text-parchment mb-2">{title}</h3>
               <p className="font-mono text-sm text-parchment/70">{description}</p>
             </button>
@@ -110,8 +114,16 @@ export function RoleSelectScreen({ selectedRoles, onSelect, onClaim }: RoleSelec
         })}
       </div>
 
+      {/* Role queue indicator */}
+      {selectedRoles.length > 1 && (
+        <p className="mt-4 font-mono text-parchment/60 text-sm">
+          You&apos;ll complete {selectedRoles.length} role onboardings
+        </p>
+      )}
+
       {/* CTA Button */}
       <button
+        ref={buttonRef}
         onClick={handleClaim}
         disabled={selectedRoles.length === 0 || isAnimating}
         className={`mt-10 px-8 py-4 font-mono font-bold text-lg rounded-lg transition-all duration-300

@@ -1,14 +1,31 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
+import type { Role } from '@/lib/types'
 
 interface PirateScrollProps {
   scenes: ReactNode[]
   onBack?: () => void
   showBackOnScene?: number
+  currentRoleIndex?: number
+  totalRoles?: number
+  roleName?: string
 }
 
-export function PirateScroll({ scenes, onBack, showBackOnScene = 1 }: PirateScrollProps) {
+const roleLabels: Record<Role, string> = {
+  growth: 'GROWTH',
+  venture: 'VENTURE RESEARCH',
+  cohort: 'COHORT',
+}
+
+export function PirateScroll({ 
+  scenes, 
+  onBack, 
+  showBackOnScene = 1,
+  currentRoleIndex,
+  totalRoles,
+  roleName
+}: PirateScrollProps) {
   const [currentScene, setCurrentScene] = useState(0)
 
   const nextScene = () => {
@@ -25,19 +42,40 @@ export function PirateScroll({ scenes, onBack, showBackOnScene = 1 }: PirateScro
     }
   }
 
+  const showRoleIndicator = currentRoleIndex && totalRoles && totalRoles > 1
+
   return (
     <div className="fixed inset-0 bg-gradient-to-b from-navy via-[#0d1e33] to-navy flex items-center justify-center p-4 overflow-hidden">
+      {/* Role queue indicator */}
+      {showRoleIndicator && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {Array.from({ length: totalRoles }).map((_, i) => (
+              <div
+                key={i}
+                className={`w-2 h-2 rounded-full transition-all ${
+                  i < currentRoleIndex ? 'bg-gold' : i === currentRoleIndex - 1 ? 'bg-gold' : 'bg-rope/40'
+                }`}
+              />
+            ))}
+          </div>
+          <span className="font-mono text-parchment/80 text-xs uppercase tracking-wider">
+            Role {currentRoleIndex} of {totalRoles} {roleName ? `· ${roleName}` : ''}
+          </span>
+        </div>
+      )}
+
       {/* Parchment scroll */}
       <div className="relative w-full max-w-2xl">
         {/* Scroll top roll */}
-        <div className="h-8 bg-gradient-to-b from-rope to-[#5c4a1f] rounded-t-lg shadow-lg relative">
+        <div className="h-6 md:h-8 bg-gradient-to-b from-rope to-[#5c4a1f] rounded-t-lg shadow-lg relative">
           <div className="absolute inset-x-0 bottom-0 h-2 bg-gradient-to-b from-[#4a3d18] to-transparent" />
         </div>
         
         {/* Main scroll content */}
         <div 
           key={currentScene}
-          className="parchment p-8 md:p-12 min-h-[400px] relative animate-scroll-unroll noise"
+          className="parchment p-6 md:p-12 min-h-[350px] md:min-h-[400px] relative animate-scroll-unroll noise"
         >
           <div className="relative z-10">
             {scenes[currentScene]}
@@ -45,7 +83,7 @@ export function PirateScroll({ scenes, onBack, showBackOnScene = 1 }: PirateScro
         </div>
 
         {/* Scroll bottom roll */}
-        <div className="h-8 bg-gradient-to-t from-rope to-[#5c4a1f] rounded-b-lg shadow-lg relative">
+        <div className="h-6 md:h-8 bg-gradient-to-t from-rope to-[#5c4a1f] rounded-b-lg shadow-lg relative">
           <div className="absolute inset-x-0 top-0 h-2 bg-gradient-to-t from-[#4a3d18] to-transparent" />
         </div>
 
@@ -90,7 +128,7 @@ export function ScrollButton({
   className = ''
 }: { 
   children: ReactNode
-  onClick: () => void
+  onClick: (e: React.MouseEvent) => void
   variant?: 'primary' | 'secondary' | 'outline'
   disabled?: boolean
   className?: string

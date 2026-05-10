@@ -1,18 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { PirateScroll, NextButton, ScrollButton } from '@/components/pirate-scroll'
-import { CoinAnimation } from '@/components/doubloon-counter'
 import { ding } from '@/lib/audio'
-import type { Role } from '@/lib/types'
 
 interface GrowthScreenProps {
   posts: string[]
   onUpdatePosts: (posts: string[]) => void
-  onEarnDoubloons: (amount: number, reason: string) => void
+  onEarnDoubloons: (amount: number, reason: string, clickX?: number, clickY?: number) => void
   onComplete: () => void
-  onAddRole: (role: Role) => void
-  availableRoles: Role[]
+  currentRoleIndex?: number
+  totalRoles?: number
+}
+
+// LinkedIn post URL validation
+const linkedInPostRegex = /^https?:\/\/(www\.)?linkedin\.com\/(posts|feed)\//
+
+function isValidLinkedInPost(url: string): boolean {
+  return linkedInPostRegex.test(url.trim())
 }
 
 export function GrowthScreen({ 
@@ -20,20 +25,41 @@ export function GrowthScreen({
   onUpdatePosts, 
   onEarnDoubloons, 
   onComplete,
-  onAddRole,
-  availableRoles
+  currentRoleIndex,
+  totalRoles
 }: GrowthScreenProps) {
   const [isVerifying, setIsVerifying] = useState(false)
   const [verified, setVerified] = useState(false)
-  const [coinsToShow, setCoinsToShow] = useState(0)
   const [sceneIndex, setSceneIndex] = useState(0)
   const [screenshotFile, setScreenshotFile] = useState('')
+  const [postErrors, setPostErrors] = useState<Record<number, string>>({})
+  const verifyButtonRef = useRef<HTMLButtonElement>(null)
 
-  const validPosts = posts.filter(p => p.trim().length > 0)
+  const validPosts = posts.filter(p => p.trim().length > 0 && isValidLinkedInPost(p))
+  const filledPosts = posts.filter(p => p.trim().length > 0)
+  const potentialDoubloons = Math.max(filledPosts.length, 3) * 5
 
-  const handleVerify = async () => {
+  const handleVerify = async (e: React.MouseEvent) => {
+    // Validate all filled posts
+    const errors: Record<number, string> = {}
+    posts.forEach((post, index) => {
+      const trimmed = post.trim()
+      if (trimmed.length > 0 && !isValidLinkedInPost(trimmed)) {
+        errors[index] = 'Must be a valid LinkedIn post URL'
+      }
+    })
+
+    if (Object.keys(errors).length > 0) {
+      setPostErrors(errors)
+      return
+    }
+
     if (validPosts.length < 3) return
+    
     setIsVerifying(true)
+    const buttonRect = verifyButtonRef.current?.getBoundingClientRect()
+    const clickX = buttonRect ? buttonRect.left + buttonRect.width / 2 : e.clientX
+    const clickY = buttonRect ? buttonRect.top + buttonRect.height / 2 : e.clientY
     
     // Mock verification delay
     await new Promise(resolve => setTimeout(resolve, 2000))
@@ -41,13 +67,14 @@ export function GrowthScreen({
     setIsVerifying(false)
     setVerified(true)
     
-    // Animate coins one by one
+    // Award doubloons with flying coin animation
     const earnPerPost = 5
+    const totalEarned = validPosts.length * earnPerPost
+    
     for (let i = 0; i < validPosts.length; i++) {
       setTimeout(() => {
-        setCoinsToShow(i + 1)
         ding()
-        onEarnDoubloons(earnPerPost, `Growth post #${i + 1}`)
+        onEarnDoubloons(earnPerPost, `Growth post #${i + 1}`, clickX, clickY)
       }, i * 500)
     }
   }
@@ -56,6 +83,15 @@ export function GrowthScreen({
     const newPosts = [...posts]
     newPosts[index] = value
     onUpdatePosts(newPosts)
+    
+    // Clear error when typing
+    if (postErrors[index]) {
+      setPostErrors(prev => {
+        const updated = { ...prev }
+        delete updated[index]
+        return updated
+      })
+    }
   }
 
   const addPostField = () => {
@@ -64,14 +100,18 @@ export function GrowthScreen({
     }
   }
 
+  // Acceptance post URL with proper encoding
+  const acceptanceText = encodeURIComponent("I just joined the SH1P Crew! 🚀")
+  const linkedInShareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=https://sh1p.co&summary=${acceptanceText}`
+
   const scenes = [
     // Scene 1: The Mission
     <div key="mission" className="space-y-6">
-      <h2 className="font-serif text-3xl text-navy">The Mission</h2>
-      <p className="font-mono text-navy/80 leading-relaxed">
+      <h2 className="font-serif text-2xl md:text-3xl text-navy">The Mission</h2>
+      <p className="font-mono text-navy/80 leading-relaxed text-sm md:text-base">
         To be part of the SH1P Growth Team, post <strong>3 out of 5 weekdays per week</strong> on your LinkedIn.
       </p>
-      <p className="font-mono text-navy/80 leading-relaxed">
+      <p className="font-mono text-navy/80 leading-relaxed text-sm md:text-base">
         Talk about SH1P events, launches, products, the crew — <strong>represent the brand</strong>.
       </p>
       <NextButton onClick={() => setSceneIndex(1)}>Accept Mission</NextButton>
@@ -79,22 +119,32 @@ export function GrowthScreen({
 
     // Scene 2: Submit Posts
     <div key="posts" className="space-y-6">
-      <h2 className="font-serif text-3xl text-navy">Submit Your Posts</h2>
+      <h2 className="font-serif text-2xl md:text-3xl text-navy">Submit Your Posts</h2>
       <p className="font-mono text-navy/80 text-sm">
         Drop your post URLs below. You need at least 3 to unlock your spot.
       </p>
       
+      {/* Doubloon value preview */}
+      <div className="flex items-center gap-2 text-gold font-mono text-sm">
+        <span>Earn up to +{potentialDoubloons} doubloons</span>
+      </div>
+      
       <div className="space-y-3">
         {posts.map((post, index) => (
-          <input
-            key={index}
-            type="url"
-            value={post}
-            onChange={(e) => updatePost(index, e.target.value)}
-            placeholder={`LinkedIn post URL #${index + 1}`}
-            className="w-full px-4 py-3 bg-navy/5 border-2 border-rope/30 rounded-lg font-mono text-navy text-sm
-              focus:outline-none focus:border-gold transition-colors placeholder:text-navy/40"
-          />
+          <div key={index}>
+            <input
+              type="url"
+              value={post}
+              onChange={(e) => updatePost(index, e.target.value)}
+              placeholder={`LinkedIn post URL #${index + 1}`}
+              className={`w-full px-4 py-3 bg-navy/5 border-2 rounded-lg font-mono text-navy text-sm
+                focus:outline-none focus:border-gold transition-colors placeholder:text-navy/40
+                ${postErrors[index] ? 'border-red-500' : 'border-rope/30'}`}
+            />
+            {postErrors[index] && (
+              <p className="text-red-600 text-xs mt-1 font-mono">{postErrors[index]}</p>
+            )}
+          </div>
         ))}
         
         {posts.length < 5 && (
@@ -109,19 +159,21 @@ export function GrowthScreen({
       </div>
 
       <div className="flex items-center gap-4">
-        <ScrollButton 
+        <button
+          ref={verifyButtonRef}
           onClick={handleVerify} 
-          disabled={validPosts.length < 3 || isVerifying || verified}
+          disabled={filledPosts.length < 3 || isVerifying || verified}
+          className={`px-6 py-3 font-mono font-bold rounded-lg border-2 transition-all duration-300
+            ${filledPosts.length >= 3 && !isVerifying && !verified
+              ? 'bg-navy text-gold border-gold/30 hover:bg-navy/90 hover:scale-[1.02] active:scale-[0.98]'
+              : 'bg-navy/50 text-gold/50 border-gold/10 cursor-not-allowed'
+            }`}
         >
           {isVerifying ? 'Verifying...' : verified ? 'Verified!' : 'Verify Posts'}
-        </ScrollButton>
+        </button>
         
         {verified && <span className="font-mono text-seafoam">+{validPosts.length * 5} Doubloons!</span>}
       </div>
-
-      {coinsToShow > 0 && Array.from({ length: coinsToShow }).map((_, i) => (
-        <CoinAnimation key={i} onComplete={() => {}} />
-      ))}
 
       {verified && (
         <NextButton onClick={() => setSceneIndex(2)}>Continue</NextButton>
@@ -130,15 +182,19 @@ export function GrowthScreen({
 
     // Scene 3: You're In
     <div key="success" className="space-y-6 text-center">
-      <div className="text-6xl mb-4">*</div>
-      <h2 className="font-serif text-3xl text-navy">{"You're In!"}</h2>
+      <div className="text-6xl mb-4">
+        <svg className="w-16 h-16 mx-auto text-gold" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+        </svg>
+      </div>
+      <h2 className="font-serif text-2xl md:text-3xl text-navy">{"You're In!"}</h2>
       <p className="font-mono text-navy/80">
         {"Congrats — you're part of the SH1P Growth Team."}
       </p>
       
       <div className="flex flex-col gap-3 mt-8">
         <a
-          href="https://www.linkedin.com/share?mini=true&title=I%20just%20joined%20the%20SH1P%20Crew!"
+          href={linkedInShareUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="px-6 py-3 bg-navy text-gold font-mono font-bold rounded-lg border-2 border-gold/30
@@ -147,7 +203,9 @@ export function GrowthScreen({
           Make your acceptance post &rarr;
         </a>
         <a
-          href="#graphics"
+          href="https://sh1p.co/graphics"
+          target="_blank"
+          rel="noopener noreferrer"
           className="px-6 py-3 bg-transparent text-navy font-mono font-bold rounded-lg border-2 border-navy/30
             transition-all duration-300 hover:border-navy/60 inline-block"
         >
@@ -158,9 +216,9 @@ export function GrowthScreen({
       <NextButton onClick={() => setSceneIndex(3)}>Continue</NextButton>
     </div>,
 
-    // Scene 4: Ongoing Engagement
+    // Scene 4: Ongoing Engagement (final scene - completes onboarding)
     <div key="engagement" className="space-y-6">
-      <h2 className="font-serif text-3xl text-navy">Ongoing Engagement</h2>
+      <h2 className="font-serif text-2xl md:text-3xl text-navy">Ongoing Engagement</h2>
       <p className="font-mono text-navy/80 text-sm leading-relaxed">
         {"Any time SH1P drops a massive event, launch, or product release — you'll get a link in your inbox."}
       </p>
@@ -187,49 +245,10 @@ export function GrowthScreen({
         )}
       </div>
 
-      <NextButton onClick={() => setSceneIndex(4)}>Continue</NextButton>
-    </div>,
-
-    // Scene 5: Join Another Team
-    <div key="addRole" className="space-y-6">
-      <h2 className="font-serif text-3xl text-navy">Join Another Team?</h2>
-      
-      {availableRoles.length > 0 ? (
-        <>
-          <p className="font-mono text-navy/80 text-sm">
-            You can add more roles to your crew membership.
-          </p>
-          <div className="space-y-3">
-            {availableRoles.includes('venture') && (
-              <button
-                onClick={() => onAddRole('venture')}
-                className="w-full p-4 text-left border-2 border-rope/30 rounded-lg hover:border-gold transition-colors"
-              >
-                <div className="font-mono text-xl text-gold mb-1">*</div>
-                <h3 className="font-serif text-lg text-navy">Venture Research</h3>
-                <p className="font-mono text-xs text-navy/70">Scout the frontier. Post insights.</p>
-              </button>
-            )}
-            {availableRoles.includes('cohort') && (
-              <button
-                onClick={() => onAddRole('cohort')}
-                className="w-full p-4 text-left border-2 border-rope/30 rounded-lg hover:border-gold transition-colors"
-              >
-                <div className="font-mono text-xl text-gold mb-1">+</div>
-                <h3 className="font-serif text-lg text-navy">Aspiring Cohort Member</h3>
-                <p className="font-mono text-xs text-navy/70">Apply to the next SH1P cohort.</p>
-              </button>
-            )}
-          </div>
-        </>
-      ) : (
-        <p className="font-mono text-navy/80 text-sm">
-          {"You've joined all available teams!"}
-        </p>
-      )}
-
       <ScrollButton onClick={onComplete} variant="primary">
-        Go to Dashboard &rarr;
+        {totalRoles && currentRoleIndex && currentRoleIndex < totalRoles 
+          ? 'Continue to Next Role' 
+          : 'Go to Dashboard'} &rarr;
       </ScrollButton>
     </div>,
   ]
@@ -238,6 +257,9 @@ export function GrowthScreen({
     <PirateScroll 
       scenes={[scenes[sceneIndex]]} 
       onBack={sceneIndex > 0 ? () => setSceneIndex(sceneIndex - 1) : undefined}
+      currentRoleIndex={currentRoleIndex}
+      totalRoles={totalRoles}
+      roleName="GROWTH"
     />
   )
 }

@@ -14,22 +14,39 @@ const welcomeMessages = [
 ]
 
 export function WheelScreen({ onContinue }: WheelScreenProps) {
-  const [visibleMessages, setVisibleMessages] = useState(0)
+  const [currentMessageIndex, setCurrentMessageIndex] = useState(0)
+  const [isMessageVisible, setIsMessageVisible] = useState(true)
+  const [allMessagesShown, setAllMessagesShown] = useState(false)
   const [isHovering, setIsHovering] = useState(false)
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setVisibleMessages((prev) => {
-        if (prev < welcomeMessages.length) return prev + 1
-        return prev
-      })
-    }, 600)
+    if (allMessagesShown) return
 
-    return () => clearInterval(interval)
-  }, [])
+    const cycleMessage = () => {
+      // Fade out
+      setIsMessageVisible(false)
+      
+      setTimeout(() => {
+        setCurrentMessageIndex(prev => {
+          const next = prev + 1
+          if (next >= welcomeMessages.length) {
+            setAllMessagesShown(true)
+            return prev
+          }
+          return next
+        })
+        // Fade in
+        setIsMessageVisible(true)
+      }, 400)
+    }
+
+    // Show each message for 1.6s
+    const timer = setTimeout(cycleMessage, 1600)
+    return () => clearTimeout(timer)
+  }, [currentMessageIndex, allMessagesShown])
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-navy via-[#0d1e33] to-navy flex flex-col items-center justify-center overflow-hidden">
+    <div className="fixed inset-0 bg-gradient-to-b from-navy via-[#0d1e33] to-navy flex flex-col items-center justify-center overflow-hidden p-4">
       {/* Ship wheel */}
       <div 
         className="relative"
@@ -40,7 +57,7 @@ export function WheelScreen({ onContinue }: WheelScreenProps) {
           width="320"
           height="320"
           viewBox="0 0 320 320"
-          className={`drop-shadow-2xl transition-all duration-1000 ${
+          className={`drop-shadow-2xl transition-all duration-1000 w-[min(80vw,320px)] h-[min(80vw,320px)] ${
             isHovering ? 'animate-spin-slower' : 'animate-spin-slow'
           }`}
         >
@@ -102,37 +119,27 @@ export function WheelScreen({ onContinue }: WheelScreenProps) {
           })}
         </svg>
 
-        {/* Center text - doesn't rotate */}
+        {/* Center text container - doesn't rotate, shows welcome messages */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-20 h-20 flex items-center justify-center">
-            <span className="font-serif text-gold text-xl font-bold">SH1P</span>
+          <div className="w-24 h-24 flex items-center justify-center text-center px-2">
+            <span 
+              className={`font-serif text-gold text-sm leading-tight transition-opacity duration-300 ${
+                isMessageVisible ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
+              {allMessagesShown ? 'SH1P' : welcomeMessages[currentMessageIndex]}
+            </span>
           </div>
         </div>
-      </div>
-
-      {/* Welcome messages */}
-      <div className="mt-12 h-40 flex flex-col items-center justify-start gap-2">
-        {welcomeMessages.map((message, index) => (
-          <p
-            key={index}
-            className={`font-serif text-xl md:text-2xl text-parchment text-center transition-all duration-500 ${
-              index < visibleMessages
-                ? 'opacity-100 translate-y-0'
-                : 'opacity-0 translate-y-4'
-            }`}
-          >
-            {message}
-          </p>
-        ))}
       </div>
 
       {/* CTA Button */}
       <button
         onClick={onContinue}
-        className={`mt-8 px-8 py-4 bg-gold text-navy font-mono font-bold text-lg rounded-lg 
+        className={`mt-12 px-8 py-4 bg-gold text-navy font-mono font-bold text-lg rounded-lg 
           hover:bg-rope transition-all duration-300 hover:scale-105 active:scale-95
           shadow-lg shadow-gold/20 ${
-            visibleMessages >= welcomeMessages.length
+            allMessagesShown
               ? 'opacity-100 translate-y-0'
               : 'opacity-0 translate-y-4 pointer-events-none'
           }`}

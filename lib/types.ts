@@ -14,7 +14,7 @@ export interface UserData {
   firstName: string
   lastName: string
   linkedIn: string
-  gmail: string
+  email: string
   phone: string
   nationality: string
   residence: string
@@ -27,6 +27,13 @@ export interface DoubloonEvent {
   timestamp: Date
 }
 
+export interface EngagementTask {
+  id: string
+  title: string
+  doubloonValue: number
+  completed: boolean
+}
+
 export interface AppState {
   screen: Screen
   userData: UserData
@@ -37,17 +44,25 @@ export interface AppState {
   growthPosts: string[]
   venturePosts: string[]
   engagementScreenshots: string[]
+  cohortApplied: boolean
+  engagementTasks: EngagementTask[]
 }
 
 export const initialUserData: UserData = {
   firstName: '',
   lastName: '',
   linkedIn: '',
-  gmail: '',
+  email: '',
   phone: '',
   nationality: '',
   residence: '',
 }
+
+export const initialEngagementTasks: EngagementTask[] = [
+  { id: '1', title: "Like Krishna's launch post", doubloonValue: 1, completed: false },
+  { id: '2', title: 'Repost SH1P Cohort 4 announcement', doubloonValue: 1, completed: false },
+  { id: '3', title: 'Comment on the Bounty teaser', doubloonValue: 1, completed: false },
+]
 
 export const initialAppState: AppState = {
   screen: 'intro',
@@ -59,4 +74,6 @@ export const initialAppState: AppState = {
   growthPosts: ['', '', ''],
   venturePosts: ['', '', '', '', ''],
   engagementScreenshots: [],
+  cohortApplied: false,
+  engagementTasks: initialEngagementTasks,
 }
